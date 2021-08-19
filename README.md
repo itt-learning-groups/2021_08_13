@@ -11,10 +11,10 @@ This will allow us to use and better understand labels, ConfigMaps, Secrets, and
 
 * Support a cloud database for the `todoapi` by adding database configuration to its `deployment.yaml`.
 * Configure our `todoapi` deployment to allow us to deploy 3 different environments: `dev`, `qa`, and `prod`, each with its own cloud database. We'll iterate our approach for supporting multiple environments, starting with a crude hard-coded setup, working towards an increasingly more sophisticated setup:
-  * hard-coded container environment variables, using environment labels within the same k8s namespace
-  * config-map and secret to set container environment variables, using environment labels within the same k8s namespace
-  * config-map and secret to set container environment variables, using separate k8s namespaces for each deploy environment
-  * config-map to set container environment variables, and secret used via volume mount, using separate k8s namespaces for each deploy environment
+  * hard-coded container environment variables, using environment labels within the same k8s Namespace
+  * ConfigMap and Secret to set container environment variables, using environment labels within the same k8s Namespace
+  * ConfigMap and Secret to set container environment variables, using separate k8s Namespaces for each deploy environment
+  * ConfigMap to set container environment variables, and Secret used via volume mount, using separate k8s Namespaces for each deploy environment
 
 ## Lab
 
@@ -96,9 +96,9 @@ This does, however, get us one step along the path to supporting multiple enviro
 
 ### 3. Multiple Deploy Environments
 
-Check out the [1.0.0 tagged release](https://github.com/us-learn-and-devops/todoapi/tree/1.0.0) of `todoapi` and open the `/build` folder to see what this looks like.
+Check out the [1.0.0 tagged release](https://github.com/us-learn-and-devops/todoapi/tree/1.0.0) of `todoapi` and open the `/build/k8s` folder to see what this looks like.
 
-(Because this code was committed to version control, I used the values `" <redacted> "` as placeholders for DB_USERNAME and DB_PSWD instead of real values. I'll share the username/password with you privately if you'd like to connect to the cloud DB.)
+*(Note: Because this code was committed to version control, I used the values `" <redacted> "` as placeholders for DB_USERNAME and DB_PSWD instead of real values. I'll share the username/password with you privately if you'd like to connect to the cloud DB.)*
 
 The `/build/k8s` folder contains sub-folders for each (`dev`, `qa`, and `prod`) deploy environment, because the `deployment.yaml` and `service.yaml` files must be unique for each environment.
 
@@ -111,15 +111,15 @@ To differentiate the todoapi `deployment` and `service` for the `dev` environmen
 
 If you add in non-redacted DB_USERNAME and DB_PSWD [here](https://github.com/us-learn-and-devops/todoapi/blob/1.0.0/build/k8s/dev/deployment.yaml#L33-L36), [here](https://github.com/us-learn-and-devops/todoapi/blob/1.0.0/build/k8s/qa/deployment.yaml#L33-L36), and [here](https://github.com/us-learn-and-devops/todoapi/blob/1.0.0/build/k8s/prod/deployment.yaml#L33-L36), you can go to the `build/k8s` folder and run the [deploy.sh](https://github.com/us-learn-and-devops/todoapi/blob/1.0.0/build/k8s/deploy.sh) script to deploy each environment:
 
-* Run `./deploy.sh dev` to deploy the `dev` environment
-* Run `./deploy.sh qa` to deploy the `qa` environment
-* Run `./deploy.sh prod` to deploy the `prod` environment
+* Run `./deploy.sh dev` to deploy the dev environment
+* Run `./deploy.sh qa` to deploy the qa environment
+* Run `./deploy.sh prod` to deploy the prod environment
 
 If you want to clean up any of these deployed environments, you can run the [destroy.sh](https://github.com/us-learn-and-devops/todoapi/blob/1.0.0/build/k8s/destroy.sh) script to do so. This takes advantage of the `app` and `env` labels we added to each deployed resource to selectively delete them from the cluster:
 
-* Run `./destroy.sh dev` to delete the `dev` environment
-* Run `./destroy.sh qa` to delete the `qa` environment
-* Run `./destroy.sh prod` to delete the `prod` environment
+* Run `./destroy.sh dev` to delete the dev environment
+* Run `./destroy.sh qa` to delete the qa environment
+* Run `./destroy.sh prod` to delete the prod environment
 
 ### 4. Add a ConfigMap for DB Non-Private Config Values
 
@@ -127,13 +127,15 @@ We'll make our database configuration more sophisticated by creating a [ConfigMa
 
 Check out the [1.1.0 tagged release](https://github.com/us-learn-and-devops/todoapi/tree/1.1.0) of `todoapi` and take a look at the `/build/k8s` [config.yaml](https://github.com/us-learn-and-devops/todoapi/blob/1.1.0/build/k8s/dev/config.yaml) manifests in the dev, qa, and prod folders.
 
-We'll [use these values](https://github.com/us-learn-and-devops/todoapi/blob/1.1.0/build/k8s/dev/deployment.yaml#L27-L41) in an updated version of our `deployment.yaml` for the given environment.
+We'll use [these values](https://github.com/us-learn-and-devops/todoapi/blob/1.1.0/build/k8s/dev/deployment.yaml#L27-L41) in an updated version of our `deployment.yaml` for the given environment.
 
-These `ConfigMap` manifests are unique to a given deploy environment, so we need one each for the `dev`, `qa`, and `prod` environments.
+This allow us to supply the non-private DB_HOSTNAME, DB_DBNAME, and DB_TODOS_COLLECTION values to each of our deploy environments. Those values are unique to a given deploy environment, so we need one `config.yaml` each for the `dev`, `qa`, and `prod` environments.
+
+A `ConfigMap` is not encrypted. That's fine for the non-private B_HOSTNAME, DB_DBNAME, and DB_TODOS_COLLECTION values, but not for the private DB_USERNAME and DB_PSWD. For these, we'll use a k8s Secret.
 
 ### 5. Add a K8s Secret for Private DB Config Values
 
-A `ConfigMap` is not encrypted. Kubernetes also provides the [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) object to hold encrypted config data. As k8s docs state:
+Kubernetes provides the [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) object type to hold encrypted config data. As k8s docs state:
 
         Secrets are similar to ConfigMaps but are specifically intended to hold confidential data.
 
